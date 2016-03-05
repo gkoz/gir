@@ -235,7 +235,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "rustdoc-stripper"
 version = "0.1.0"
-source = "git+https://github.com/GuillaumeGomez/rustdoc-stripper#eb7309d26d94b2d567687543e942c7cccc34d9e6"
+source = "git+https://github.com/GuillaumeGomez/rustdoc-stripper#af5197426d3f702803052c1b702bf7e0d7f5c679"
 
 [[package]]
 name = "strsim"
