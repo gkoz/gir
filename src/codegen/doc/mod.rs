@@ -32,7 +32,7 @@ macro_rules! impl_to_stripper_type {
 
 impl_to_stripper_type!(Member, Variant);
 impl_to_stripper_type!(Enumeration, Enum);
-impl_to_stripper_type!(Bitfield, Type);
+impl_to_stripper_type!(Bitfield, Flags);
 impl_to_stripper_type!(Record, Struct);
 impl_to_stripper_type!(Function, Fn);
 impl_to_stripper_type!(Class, Struct);
@@ -78,6 +78,7 @@ fn generate_doc(mut w: &mut Write, env: &Env) -> Result<()> {
 
 fn handle_type(w: &mut Write, env: &Env, ty: &LType) -> Result<()> {
     match *ty {
+        LType::Bitfield(ref e) => create_bitfield_doc(w, env, &e),
         LType::Enumeration(ref e) => create_enum_doc(w, env, &e),
         _ => Ok(()),
     }
@@ -202,8 +203,53 @@ fn create_record_doc(w: &mut Write, env: &Env, info: &analysis::record::Info) ->
     Ok(())
 }
 
+fn create_bitfield_doc(w: &mut Write, env: &Env, bitfield: &Bitfield) -> Result<()> {
+    let ty = TypeStruct { name: bitfield.c_type.clone(), ..bitfield.to_stripper_type() };
+    let symbols = env.symbols.borrow();
+
+    try!(write_item_doc(w, &ty, |w| {
+        if let Some(ref doc) = bitfield.doc {
+            try!(writeln!(w, "{}", reformat_doc(doc, &symbols)));
+        }
+        if let Some(ver) = bitfield.deprecated_version {
+            try!(writeln!(w, "\n# Deprecated since {}\n", ver));
+        } else if bitfield.doc_deprecated.is_some() {
+            try!(writeln!(w, "\n# Deprecated\n"));
+        }
+        if let Some(ref doc) = bitfield.doc_deprecated {
+            try!(writeln!(w, "{}", reformat_doc(doc, &symbols)));
+        }
+        Ok(())
+    }));
+
+    for member in bitfield.members.iter() {
+        let sub_ty = TypeStruct {
+            name: member.c_identifier.clone(),
+            ty: SType::Const,
+            parent: Some(Box::new(ty.clone())),
+            args: Vec::new(),
+        };
+
+        if member.doc.is_some() {
+            try!(write_item_doc(w, &sub_ty, |w| {
+                if let Some(ref doc) = member.doc {
+                    try!(writeln!(w, "{}", reformat_doc(doc, &symbols)));
+                }
+                Ok(())
+            }));
+        }
+    }
+
+    if let Some(version) = bitfield.version {
+        if version > env.config.min_cfg_version {
+            try!(writeln!(w, "\nSince: {}\n", version));
+        }
+    }
+    Ok(())
+}
+
 fn create_enum_doc(w: &mut Write, env: &Env, enum_: &Enumeration) -> Result<()> {
-    let ty = enum_.to_stripper_type();
+    let ty = TypeStruct { name: enum_.c_type.clone(), ..enum_.to_stripper_type() };
     let symbols = env.symbols.borrow();
 
     try!(write_item_doc(w, &ty, |w| {
